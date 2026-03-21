@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session, abort
+﻿from flask import Flask, render_template, request, redirect, url_for, flash, session, abort
 from config import Config
 from db import init_db_pool, close_all_connections
 from models import (
@@ -11,6 +11,7 @@ from models import (
 from werkzeug.security import check_password_hash
 import logging
 from functools import wraps
+import os
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -65,6 +66,17 @@ def get_cart_total(user_id):
 
 # маршруты
 def register_routes(app):
+    def save_product_image(image_file, product_id):
+        if not image_file or not image_file.filename:
+            return None
+        if not image_file.filename.lower().endswith('.png'):
+            return False
+        images_dir = os.path.join(app.root_path, 'static', 'images')
+        os.makedirs(images_dir, exist_ok=True)
+        image_path = os.path.join(images_dir, f'{product_id}.png')
+        image_file.save(image_path)
+        return True
+
     @app.route('/')
     def index():
         # главная стр
@@ -332,6 +344,7 @@ def register_routes(app):
             description = request.form.get('description', '').strip()
             price = request.form.get('price')
             stock = request.form.get('stock')
+            image_file = request.files.get('image')
             try:
                 price = float(price) if price is not None else 0
             except (TypeError, ValueError):
@@ -342,9 +355,15 @@ def register_routes(app):
                 stock = int(stock) if stock is not None else 0
             except (TypeError, ValueError):
                 stock = 0
-            success = create_product(name, description, price, stock)
-            if success:
-                flash('Товар добавлен.', 'success')
+            product_id = create_product(name, description, price, stock)
+            if product_id:
+                image_saved = save_product_image(image_file, product_id)
+                if image_saved is False:
+                    flash('Товар добавлен. Картинка не загружена: используйте PNG.', 'warning')
+                elif image_saved:
+                    flash('Товар и картинка успешно добавлены.', 'success')
+                else:
+                    flash('Товар добавлен.', 'success')
             else:
                 flash('Не удалось добавить товар.', 'danger')
             return redirect(url_for('admin_products'))
@@ -374,6 +393,7 @@ def register_routes(app):
             description = request.form.get('description', '').strip()
             price = request.form.get('price')
             stock = request.form.get('stock')
+            image_file = request.files.get('image')
             try:
                 price = float(price) if price is not None else 0
             except (TypeError, ValueError):
@@ -391,7 +411,13 @@ def register_routes(app):
                 stock=stock
             )
             if success:
-                flash('Товар обновлен.', 'success')
+                image_saved = save_product_image(image_file, product_id)
+                if image_saved is False:
+                    flash('Товар обновлен. Картинка не загружена: используйте PNG.', 'warning')
+                elif image_saved:
+                    flash('Товар и картинка обновлены.', 'success')
+                else:
+                    flash('Товар обновлен.', 'success')
             else:
                 flash('Не удалось обновить товар.', 'danger')
             return redirect(url_for('admin_products'))
