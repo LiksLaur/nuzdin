@@ -1,4 +1,4 @@
-﻿from db import get_db_connection, release_db_connection
+from db import get_db_connection, release_db_connection
 from werkzeug.security import generate_password_hash, check_password_hash
 import logging
 logger = logging.getLogger(__name__)
@@ -443,6 +443,12 @@ def place_order(user_id):
             SET price_at_time = p.price
             FROM products p
             WHERE oi.product_id = p.id AND oi.order_id = %s
+        """, (cart_id,))
+        cursor.execute("""
+            UPDATE products p
+            SET stock = p.stock - oi.quantity
+            FROM order_items oi
+            WHERE oi.order_id = %s AND oi.product_id = p.id
         """, (cart_id,))
         cursor.execute(
             "UPDATE orders SET status = 'new' WHERE id = %s RETURNING id",
